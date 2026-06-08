@@ -9,7 +9,7 @@ import pytest
 from sqlalchemy import text
 
 from app.core.database_pool import db_pool
-from app.services.properties import list_properties
+from app.services.properties import get_property, list_properties
 
 
 async def _ensure_db_or_skip():
@@ -53,3 +53,16 @@ async def test_shared_property_id_resolves_per_tenant():
 async def test_unknown_tenant_returns_empty():
     await _ensure_db_or_skip()
     assert await list_properties("tenant-does-not-exist") == []
+
+
+async def test_get_property_returns_row_for_owning_tenant():
+    await _ensure_db_or_skip()
+    prop = await get_property("prop-002", "tenant-a")  # prop-002 belongs to tenant-a
+    assert prop is not None
+    assert prop["id"] == "prop-002"
+
+
+async def test_get_property_returns_none_for_foreign_tenant():
+    """tenant-b does not own prop-002, so it must not resolve."""
+    await _ensure_db_or_skip()
+    assert await get_property("prop-002", "tenant-b") is None
