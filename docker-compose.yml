@@ -9,6 +9,12 @@ services:
       - "8000:8000"
     environment:
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/propertyflow
+      # Discrete DB connection settings used by DatabasePool (mirror DATABASE_URL)
+      - SUPABASE_DB_USER=postgres
+      - SUPABASE_DB_PASSWORD=postgres
+      - SUPABASE_DB_HOST=db
+      - SUPABASE_DB_PORT=5432
+      - SUPABASE_DB_NAME=propertyflow
       - REDIS_URL=redis://redis:6379/0
       - SECRET_KEY=debug_challenge_secret
     depends_on:

@@ -7,12 +7,34 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+# Database settings required for DatabasePool to build a valid async DSN.
+# Validated at startup so a misconfigured DB fails loudly instead of
+# silently falling back to mock data.
+REQUIRED_DATABASE_SETTINGS = (
+    "supabase_db_user",
+    "supabase_db_password",
+    "supabase_db_host",
+    "supabase_db_port",
+    "supabase_db_name",
+)
+
+
 class Settings(BaseSettings):
     # Core settings
     database_url: str = "postgresql://postgres:postgres@db:5432/propertyflow"
     redis_url: str = "redis://redis:6379/0"
     secret_key: str = "debug_challenge_secret"
-    
+
+    # Database connection (used by DatabasePool to build the async DSN).
+    # Defaults match docker-compose; override per environment via
+    # SUPABASE_DB_USER / SUPABASE_DB_PASSWORD / SUPABASE_DB_HOST /
+    # SUPABASE_DB_PORT / SUPABASE_DB_NAME.
+    supabase_db_user: str = "postgres"
+    supabase_db_password: str = "postgres"
+    supabase_db_host: str = "db"
+    supabase_db_port: int = 5432
+    supabase_db_name: str = "propertyflow"
+
     # Optional legacy settings
     supabase_url: Optional[str] = None
     supabase_service_role_key: Optional[str] = None
@@ -132,6 +154,24 @@ class Settings(BaseSettings):
     redis_port: int = 6379
     redis_db: int = 0
     redis_password: Optional[str] = None
+
+    def missing_database_settings(self) -> List[str]:
+        """Return required DB settings that are unset or empty.
+
+        A string field is considered missing if it is None or blank; the
+        numeric port is missing only if it is None or non-positive. Used at
+        startup to fail fast on a misconfigured database.
+        """
+        missing: List[str] = []
+        for field in REQUIRED_DATABASE_SETTINGS:
+            value = getattr(self, field, None)
+            if value is None:
+                missing.append(field)
+            elif isinstance(value, str) and not value.strip():
+                missing.append(field)
+            elif isinstance(value, int) and not isinstance(value, bool) and value <= 0:
+                missing.append(field)
+        return missing
 
     def get_hostaway_tokens(self) -> Dict[str, str]:
         """Parse Hostaway tokens from JSON string or fallback to space-separated format"""
