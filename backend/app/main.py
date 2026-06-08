@@ -90,6 +90,21 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info("Starting up...")
 
+    # Fail fast on missing required database configuration. Unlike the
+    # connection pools below, a misconfigured DB must abort startup rather
+    # than silently degrade to mock data.
+    from .config import settings
+
+    missing_db_settings = settings.missing_database_settings()
+    if missing_db_settings:
+        env_names = ", ".join(name.upper() for name in missing_db_settings)
+        logger.critical(f"❌ Missing required database configuration: {env_names}")
+        raise RuntimeError(
+            f"Cannot start application: required database settings are not "
+            f"configured: {env_names}"
+        )
+    logger.info("✅ Database configuration validated")
+
     # Initialize Supabase connection pool
     try:
         from .core.supabase_connection_pool import supabase_pool
