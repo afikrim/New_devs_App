@@ -1468,6 +1468,22 @@ export class SecureAPIClient {
     return this.request<any>(`/api/v1/dashboard/summary?${queryParams}`, requestOptions);
   }
 
+  /**
+   * Get the tenant's properties for the dashboard selector.
+   * Returns the properties array directly (backend wraps it in { properties }).
+   */
+  async getDashboardProperties(options?: { simulatedTenant?: string }) {
+    const requestOptions: RequestInit = {};
+    if (options?.simulatedTenant) {
+      requestOptions.headers = {
+        'X-Simulated-Tenant': options.simulatedTenant
+      };
+    }
+
+    const res = await this.request<any>('/api/v1/dashboard/properties', requestOptions);
+    return Array.isArray(res?.properties) ? res.properties : [];
+  }
+
   async uploadCompanyLogo(logo_url: string) {
     return this.request<any>('/api/v1/company-settings/logo', {
       method: 'POST',
