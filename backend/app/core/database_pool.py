@@ -45,8 +45,12 @@ class DatabasePool:
         if self.engine:
             await self.engine.dispose()
     
-    async def get_session(self) -> AsyncSession:
-        """Get database session from pool"""
+    def get_session(self) -> AsyncSession:
+        """Get a database session from the pool.
+
+        Returns the AsyncSession directly (not a coroutine) so callers can
+        use it as an async context manager: ``async with pool.get_session()``.
+        """
         if not self.session_factory:
             raise Exception("Database pool not initialized")
         return self.session_factory()

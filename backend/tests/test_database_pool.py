@@ -8,10 +8,14 @@ back to mock revenue data):
    that did not exist on ``Settings``, raising ``AttributeError``.
 2. ``poolclass=QueuePool`` is rejected by SQLAlchemy's asyncio engine; an
    async-adapted pool class is required.
+3. ``get_session()`` was ``async def``, so it returned a coroutine and broke
+   every ``async with db_pool.get_session()`` call site.
 
-Both failures happen at engine *construction* time, so these tests need no
-live database connection.
+Both engine failures happen at engine *construction* time, so these tests
+need no live database connection.
 """
+
+import inspect
 
 from sqlalchemy.pool import AsyncAdaptedQueuePool, QueuePool
 
@@ -76,5 +80,36 @@ async def test_engine_dsn_uses_asyncpg_driver():
     try:
         await pool.initialize()
         assert pool.engine.url.drivername == "postgresql+asyncpg"
+    finally:
+        await pool.close()
+
+
+async def test_get_session_returns_async_context_manager_not_coroutine():
+    """Bug 3: get_session() must return a session usable directly as an
+    async context manager, not a coroutine.
+
+    Callers use ``async with db_pool.get_session() as session``. If
+    get_session is made ``async def`` again it returns a coroutine, and that
+    line fails with "'coroutine' object does not support the asynchronous
+    context manager protocol" - exactly the production error this guards.
+    """
+    pool = DatabasePool()
+    try:
+        await pool.initialize()
+
+        result = pool.get_session()
+        assert not inspect.iscoroutine(result), (
+            "get_session() returned a coroutine; it must return the "
+            "AsyncSession directly (do not make it `async def`)"
+        )
+        assert hasattr(result, "__aenter__") and hasattr(result, "__aexit__"), (
+            "get_session() result is not usable as an async context manager"
+        )
+
+        # Exercise the exact call-site pattern; reproduces the production
+        # error if the contract regresses. (Entering the session is lazy and
+        # does not require a live connection.)
+        async with pool.get_session() as session:
+            assert session is not None
     finally:
         await pool.close()
