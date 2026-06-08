@@ -45,3 +45,6 @@ dev = [
 testpaths = ["tests"]
 pythonpath = ["."]
 asyncio_mode = "auto"
+# Share one event loop across the session so tests reusing the module-level
+# db_pool singleton don't hit connections bound to a previous, closed loop.
+asyncio_default_test_loop_scope = "session"
